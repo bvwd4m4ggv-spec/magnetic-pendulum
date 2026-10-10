@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Magnetic Pendulum: Initial Position, Damping, and Numerical Convergence</title>
+  <script>
+  MathJax = {
+    tex: {
+      inlineMath: [['\\(', '\\)'], ['$', '$']],
+      displayMath: [['\\[', '\\]']]
+    },
+    svg: {
+      fontCache: 'global'
+    }
+  };
+</script>
+<script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"
+  async>
+</script>
+
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --panel: #ffffff;
+      --ink: #1c2736;
+      --muted: #5b6a7d;
+      --border: #d7e1ed;
+      --blue: #246bfd;
+      --purple: #7d4cdb;
+      --red: #e84d5b;
+      --green: #1fad75;
+      --orange: #f59c1a;
+      --gray: #9aa7b7;
+      --shadow: 0 3px 14px rgba(34, 52, 79, 0.11);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.45;
+    }
+
+    header {
+      color: white;
+      padding: 24px 20px 20px;
+      background: linear-gradient(125deg, #123b8f, #246bfd);
+    }
+
+    header h1 {
+      margin: 0 0 7px;
+      font-size: clamp(1.4rem, 3vw, 2.1rem);
+    }
+
+    header p {
+      margin: 0;
+      max-width: 980px;
+      opacity: 0.95;
+    }
+
+    main,
+    footer {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 310px minmax(390px, 1.25fr) minmax(370px, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    h2,
+    h3 {
+      margin-top: 0;
+    }
+
+    h2 {
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e9eff7;
+      font-size: 1.12rem;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+      font-size: 0.98rem;
+    }
+
+    .control {
+      margin: 13px 0;
+    }
+
+    .control label,
+    .comparison-controls label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    output {
+      color: var(--blue);
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-top: 6px;
+      accent-color: var(--blue);
+    }
+
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 17px 0 12px;
+    }
+
+    button {
+      padding: 9px 10px;
+      border: 0;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--blue);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    button:hover:not(:disabled) {
+      filter: brightness(0.93);
+    }
+
+    button:disabled {
+      opacity: 0.62;
+      cursor: not-allowed;
+    }
+
+    .pause { background: #e68b19; }
+    .reset { background: #667487; }
+    .compare { background: var(--purple); width: 100%; margin-top: 9px; }
+    .basin { background: #168461; width: 100%; margin-top: 10px; }
+
+    .hint,
+    .theory-box,
+    .warning {
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.86rem;
+    }
+
+    .hint {
+      border-left: 4px solid var(--blue);
+      background: #edf4ff;
+    }
+
+    .theory-box {
+      border-left: 4px solid var(--green);
+      background: #ebf9f2;
+      margin-top: 12px;
+    }
+
+    .warning {
+      display: none;
+      margin-top: 10px;
+      color: #7a2b00;
+      border-left: 4px solid var(--orange);
+      background: #fff0e6;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fcfdff;
+    }
+
+    #motionCanvas {
+      min-height: 350px;
+      aspect-ratio: 1 / 1;
+    }
+
+    #basinCanvas {
+      max-width: 540px;
+      margin: 8px auto 0;
+      aspect-ratio: 1 / 1;
+    }
+
+    .caption,
+    .status-text {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .readouts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .readout {
+      padding: 9px;
+      border: 1px solid #e0e8f2;
+      border-radius: 8px;
+      background: #f6f9fd;
+    }
+
+    .readout span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    .readout strong {
+      display: block;
+      margin-top: 1px;
+      font-size: 0.91rem;
+      overflow-wrap: anywhere;
+    }
+
+    .comparison-box {
+      margin-top: 15px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .comparison-controls {
+      display: grid;
+      gap: 8px;
+    }
+
+    .comparison-result {
+      margin-top: 10px;
+      padding: 9px;
+      color: #49317e;
+      border-radius: 8px;
+      background: #f2edff;
+      font-size: 0.84rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 3px;
+      border-radius: 50%;
+    }
+
+    .graphs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .graph-card {
+      padding: 10px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .graph-card h3 {
+      margin: 0 0 6px;
+      font-size: 0.91rem;
+    }
+
+    .graph {
+      height: 195px;
+    }
+
+    .wide-section {
+      margin-top: 16px;
+    }
+
+    .equation {
+  	overflow-x: auto;
+  	padding: 14px;
+  	background: #f5f8fd;
+  	border-radius: 7px;
+  	font-size: 1.05rem;
+  	line-height: 1.8;
+	}
+
+    ul {
+      padding-left: 21px;
+    }
+
+    @media (max-width: 1160px) {
+      .layout {
+        grid-template-columns: 300px 1fr;
+      }
+
+      .right-column {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 740px) {
+      main,
+      footer {
+        padding: 10px;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .right-column {
+        grid-column: auto;
+      }
+
+      .graphs {
+        grid-template-columns: 1fr;
+      }
+
+      .button-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Magnetic Pendulum: Initial Position, Damping, and Energy Loss</h1>
+    <p>
+      An RK4 numerical simulation for exploring how initial conditions, damping,
+      magnetic-force strength, and time step affect two-dimensional motion.
+    </p>
+  </header>
+
+  <main>
+    <div class="layout">
+
+      <!-- UI CONTROLS -->
+      <section class="panel">
+        <h2>Simulation Controls</h2>
+
+        <div class="control">
+          <label for="x0">
+            Initial x-position, x₀
+            <output id="x0Value">0.030 m</output>
+          </label>
+          <input id="x0" type="range" min="-0.10" max="0.10" step="0.001" value="0.030">
+        </div>
+
+        <div class="control">
+          <label for="y0">
+            Initial y-position, y₀
+            <output id="y0Value">0.055 m</output>
+          </label>
+          <input id="y0" type="range" min="-0.10" max="0.10" step="0.001" value="0.055">
+        </div>
+
+        <div class="control">
+          <label for="damping">
+            Damping coefficient, c
+            <output id="dampingValue">0.120 kg/s</output>
+          </label>
+          <input id="damping" type="range" min="0.01" max="0.50" step="0.005" value="0.120">
+        </div>
+
+        <div class="control">
+          <label for="mass">
+            Pendulum mass, m
+            <output id="massValue">0.150 kg</output>
+          </label>
+          <input id="mass" type="range" min="0.05" max="0.50" step="0.005" value="0.150">
+        </div>
+
+        <div class="control">
+          <label for="strength">
+            Magnetic-force strength, A
+            <output id="strengthValue">0.000060 N·m²</output>
+          </label>
+          <!-- STUDENT MODIFICATION: Test a different force-strength range or add a logarithmic slider. -->
+          <input id="strength" type="range" min="0.00001" max="0.00015" step="0.000001" value="0.000060">
+        </div>
+
+        <div class="control">
+          <label for="timeStep">
+            Integration time step, Δt
+            <output id="timeStepValue">0.0020 s</output>
+          </label>
+          <select id="timeStep">
+            <option value="0.002">0.0020 s</option>
+            <option value="0.001">0.0010 s</option>
+            <option value="0.0005">0.0005 s</option>
+          </select>
+        </div>
+
+        <div class="button-row">
+          <button id="startBtn">Start</button>
+          <button id="pauseBtn" class="pause">Pause</button>
+          <button id="resetBtn" class="reset">Reset</button>
+        </div>
+
+        <div class="hint">
+          <strong>Suggested test:</strong> Run a case using Δt = 0.002 s, then repeat
+          using Δt = 0.001 s or 0.0005 s under exactly the same physical settings.
+          Compare the path, final region, and energy-balance difference.
+        </div>
+
+        <div id="warning" class="warning"></div>
+
+        <div class="comparison-box">
+          <h3>Comparison Mode</h3>
+
+          <div class="comparison-controls">
+            <label for="compareType">Change one quantity for the purple trajectory</label>
+            <select id="compareType">
+              <option value="xPosition">Initial x-position, x₀</option>
+              <option value="yPosition">Initial y-position, y₀</option>
+              <option value="damping">Damping coefficient, c</option>
+              <option value="timeStep">Integration time step, Δt</option>
+            </select>
+
+            <label id="compareLabel" for="compareValue">Comparison x₀ (m)</label>
+            <input id="compareValue" type="number" min="-0.10" max="0.10" step="0.001" value="-0.030">
+
+            <button id="compareBtn" class="compare">Run Comparison</button>
+          </div>
+
+          <div class="comparison-result" id="comparisonResult">
+            Run a comparison to display the second trajectory and its final outcome.
+          </div>
+
+          <div class="legend">
+            <span><span class="dot" style="background:#246bfd"></span>Main trajectory</span>
+            <span><span class="dot" style="background:#7d4cdb"></span>Comparison trajectory</span>
+          </div>
+        </div>
+
+        <button id="basinBtn" class="basin">Create Basin-of-Attraction Map</button>
+        <p class="status-text">
+          The basin map uses many shorter, coarse numerical simulations and may take several seconds.
+        </p>
+
+        <div class="theory-box">
+          <strong>Theoretical expectation:</strong> With c &gt; 0, the damping force removes
+          mechanical energy. In an ideal continuous calculation,
+          E(t) + W<sub>d</sub>(t) should equal E(0). Differences displayed here help reveal
+          numerical error.
+        </div>
+      </section>
+
+      <!-- DRAWING / GRAPHING: MOTION -->
+      <section class="panel">
+        <h2>Two-Dimensional Motion</h2>
+
+        <canvas id="motionCanvas" width="700" height="700"></canvas>
+
+        <p class="caption">
+          Displayed coordinate range: −0.12 m to +0.12 m. The red, green, and orange
+          markers are fixed magnets.
+        </p>
+
+        <div class="readouts">
+          <div class="readout">
+            <span>Time</span>
+            <strong id="timeReadout">0.000 s</strong>
+          </div>
+
+          <div class="readout">
+            <span>Status</span>
+            <strong id="statusReadout">Ready</strong>
+          </div>
+
+          <div class="readout">
+            <span>Position (x, y)</span>
+            <strong id="positionReadout">(0.0300, 0.0550) m</strong>
+          </div>
+
+          <div class="readout">
+            <span>Velocity (vₓ, vᵧ)</span>
+            <strong id="velocityReadout">(0.0000, 0.0000) m/s</strong>
+          </div>
+
+          <div class="readout">
+            <span>Speed</span>
+            <strong id="speedReadout">0.00000 m/s</strong>
+          </div>
+
+          <div class="readout">
+            <span>Kinetic energy, K</span>
+            <strong id="keReadout">0.0000000 J</strong>
+          </div>
+
+          <div class="readout">
+            <span>Mechanical energy, E = K + U</span>
+            <strong id="energyReadout">0.0000000 J</strong>
+          </div>
+
+          <div class="readout">
+            <span>Cumulative damping loss, Wd</span>
+            <strong id="dissipationReadout">0.0000000 J</strong>
+          </div>
+
+          <div class="readout">
+            <span>E(t) + Wd(t)</span>
+            <strong id="energyCheckReadout">0.0000000 J</strong>
+          </div>
+
+          <div class="readout">
+            <span>Energy-balance difference</span>
+            <strong id="balanceDifferenceReadout">0.0000000 J</strong>
+          </div>
+        </div>
+
+        <p class="caption">
+          Energy-balance difference = E(t) + W<sub>d</sub>(t) − E(0). In exact arithmetic
+          for this model it would remain zero; nonzero values can reflect numerical error.
+        </p>
+      </section>
+
+      <!-- DRAWING / GRAPHING: TIME GRAPHS -->
+      <section class="panel right-column">
+        <h2>Time Graphs</h2>
+
+        <div class="graphs">
+          <div class="graph-card">
+            <h3>x-position vs time</h3>
+            <canvas id="xGraph" class="graph" width="450" height="230"></canvas>
+          </div>
+
+          <div class="graph-card">
+            <h3>y-position vs time</h3>
+            <canvas id="yGraph" class="graph" width="450" height="230"></canvas>
+          </div>
+
+          <div class="graph-card">
+            <h3>Speed vs time</h3>
+            <canvas id="speedGraph" class="graph" width="450" height="230"></canvas>
+          </div>
+
+          <div class="graph-card">
+            <h3>Energy vs time</h3>
+            <canvas id="energyGraph" class="graph" width="450" height="230"></canvas>
+          </div>
+
+          <div class="graph-card">
+            <h3>Energy-balance difference vs time</h3>
+            <canvas id="balanceGraph" class="graph" width="450" height="230"></canvas>
+          </div>
+        </div>
+
+        <div class="wide-section">
+          <h2>Basin-of-Attraction Map</h2>
+
+          <canvas id="basinCanvas" width="520" height="520"></canvas>
+
+          <div class="legend">
+            <span><span class="dot" style="background:#e84d5b"></span>Magnet 1</span>
+            <span><span class="dot" style="background:#1fad75"></span>Magnet 2</span>
+            <span><span class="dot" style="background:#f59c1a"></span>Magnet 3</span>
+            <span><span class="dot" style="background:#9aa7b7"></span>Not settled / unclear</span>
+          </div>
+
+          <p class="status-text" id="basinStatus">
+            Basin map not calculated yet.
+          </p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <section class="panel">
+      <h2>Physics Model, Numerical Method, Assumptions, and Limitations</h2>
+
+
+      
+<h3>Governing Equations</h3>
+<div class="equation">
+  \[
+  m\frac{d^2x}{dt^2}=F_x-c\frac{dx}{dt}
+  \]
+
+  \[
+  m\frac{d^2y}{dt^2}=F_y-c\frac{dy}{dt}
+  \]
+
+  \[
+  r_i=\sqrt{(x-X_i)^2+(y-Y_i)^2+h^2}
+  \]
+
+  \[
+  F_x=\sum_{i=1}^{3}\frac{A(X_i-x)}{r_i^3}
+  \]
+
+  \[
+  F_y=\sum_{i=1}^{3}\frac{A(Y_i-y)}{r_i^3}
+  \]
+</div>
+
+
+      <h3>Energy Model and Damping Check</h3>
+      <p>
+        The force model above is consistent with the simplified potential energy
+        <strong>U = −Σ A/rᵢ</strong>. The mechanical energy is
+        <strong>E = K + U</strong>, where
+        <strong>K = ½m(vₓ² + vᵧ²)</strong>.
+      </p>
+
+      <p>
+        Linear damping removes energy at the rate
+        <strong>dE/dt = −c(vₓ² + vᵧ²)</strong>. This simulation approximates the cumulative
+        dissipated energy:
+      </p>
+
+      <div class="equation">
+		\[
+
+  		W_d(t)=\int_0^t c\left(v_x^2+v_y^2\right)\,dt
+
+  		\]
+		
+		Ideal energy relation: 
+
+  		\[
+
+  		E(t)+W_d(t)\approx E(0)
+
+  		\]
+      </div>
+
+      <h3>Chosen Values</h3>
+      <ul>
+        <li>
+          The magnets form a triangle at approximately
+          (−0.065, −0.040), (0.065, −0.040), and (0.000, 0.070) m.
+        </li>
+        <li>
+          The vertical separation is h = 0.018 m. This keeps rᵢ nonzero and prevents
+          the simplified force expression from becoming singular at a magnet location.
+        </li>
+        <li>
+          The selectable RK4 steps are Δt = 0.002 s, 0.001 s, and 0.0005 s.
+          Smaller Δt can improve convergence, but it does not automatically guarantee
+          correctness, stability, or physical realism.
+        </li>
+      </ul>
+
+      <h3>Assumptions</h3>
+      <ul>
+        <li>The pendulum is represented as a point particle moving in a horizontal plane.</li>
+        <li>It starts from rest unless the source code is modified.</li>
+        <li>Gravity is balanced by support and does not directly accelerate horizontal motion.</li>
+        <li>The damping coefficient c is constant and damping is proportional to velocity.</li>
+        <li>There are no external energy inputs after release.</li>
+        <li>
+          Motion stops when the speed stays below a selected threshold for a specified duration,
+          or when maximum simulation time is reached.
+        </li>
+      </ul>
+
+      <h3>Important Limitations</h3>
+      <ul>
+        <li>
+          The magnetic-force model is a simplified educational approximation. It is not an
+          exact description of real magnetic interactions.
+        </li>
+        <li>
+          The basin map uses a coarser calculation than the displayed main trajectory, so
+          its classification can change if its resolution, simulation duration, or Δt changes.
+        </li>
+        <li>
+          Small initial-position changes may or may not produce different final regions.
+          Use the comparison mode and basin map to test this behavior for chosen parameters.
+        </li>
+        <li>
+          At very low damping, the simulated pendulum may not settle before the maximum time.
+        </li>
+      </ul>
+    </section>
+  </footer>
+
+  <script>
+    "use strict";
+
+    /*
+      ==============================================================
+      MAGNETIC PENDULUM SIMULATION
+      ==============================================================
+      Required labeled sections:
+      - PHYSICS MODEL
+      - NUMERICAL METHOD
+      - UI CONTROLS
+      - DRAWING/GRAPHING
+      - EVENT HANDLERS
+    */
+
+    // ==============================================================
+    // PHYSICS MODEL
+    // ==============================================================
+
+    const MAGNETS = [
+      { x: -0.065, y: -0.040, color: "#e84d5b", name: "Magnet 1" },
+      { x:  0.065, y: -0.040, color: "#1fad75", name: "Magnet 2" },
+      { x:  0.000, y:  0.070, color: "#f59c1a", name: "Magnet 3" }
+    ];
+
+    // STUDENT MODIFICATION: Change the magnet geometry and compare trajectories or basin maps.
+    const H = 0.018;             // Vertical separation from magnet plane, m
+    const MAX_TIME = 20.0;       // Maximum simulation time, s
+    const STOP_SPEED = 0.0010;   // Speed threshold, m/s
+    const STOP_DURATION = 0.80;  // Must remain slow for this duration, s
+    const WORLD_LIMIT = 0.12;    // Display range, m
+
+    const params = {
+      x0: 0.030,
+      y0: 0.055,
+      c: 0.120,
+      m: 0.150,
+      A: 0.000060,
+      dt: 0.002
+    };
+
+    let state = createInitialState();
+    let initialMechanicalEnergy = 0;
+
+    let history = [];
+    let trajectory = [];
+    let comparisonTrajectory = [];
+    let comparisonInfo = null;
+
+    let running = false;
+    let animationId = null;
+    let lastFrameTime = null;
+    let accumulator = 0;
+
+    function createInitialState() {
+      return {
+        x: params.x0,
+        y: params.y0,
+        vx: 0,
+        vy: 0,
+        t: 0,
+        dissipatedEnergy: 0,
+        belowThresholdTime: 0,
+        settled: false
+      };
+    }
+
+    /*
+      Returns derivatives for state:
+      dx/dt = vx
+      dy/dt = vy
+      dvx/dt = (Fx - c vx)/m
+      dvy/dt = (Fy - c vy)/m
+
+      The h² term makes the denominator finite near a magnet.
+      A small numerical lower bound is also retained as protection.
+    */
+    function derivatives(s, p) {
+      let fx = 0;
+      let fy = 0;
+
+      for (const magnet of MAGNETS) {
+        const dx = magnet.x - s.x;
+        const dy = magnet.y - s.y;
+
+        const rSquared = Math.max(dx * dx + dy * dy + H * H, 1e-12);
+        const inverseR3 = 1 / Math.pow(rSquared, 1.5);
+
+        fx += p.A * dx * inverseR3;
+        fy += p.A * dy * inverseR3;
+      }
+
+      // Linear damping force, opposite to the velocity.
+      fx -= p.c * s.vx;
+      fy -= p.c * s.vy;
+
+      return {
+        dx: s.vx,
+        dy: s.vy,
+        dvx: fx / p.m,
+        dvy: fy / p.m
+      };
+    }
+
+    /*
+      Potential energy consistent with the stated force model:
+
+      U = -Σ A / r_i
+
+      Taking -gradient(U) gives:
+      Fx = Σ A(Xi - x)/ri³
+      Fy = Σ A(Yi - y)/ri³
+    */
+    function magneticPotential(s, p) {
+      let U = 0;
+
+      for (const magnet of MAGNETS) {
+        const dx = s.x - magnet.x;
+        const dy = s.y - magnet.y;
+        const r = Math.sqrt(Math.max(dx * dx + dy * dy + H * H, 1e-12));
+        U += -p.A / r;
+      }
+
+      return U;
+    }
+
+    function kineticEnergy(s, p) {
+      return 0.5 * p.m * (s.vx * s.vx + s.vy * s.vy);
+    }
+
+    function mechanicalEnergy(s, p) {
+      return kineticEnergy(s, p) + magneticPotential(s, p);
+    }
+
+    function speedOf(s) {
+      return Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+    }
+
+    function isFiniteState(s) {
+      return Number.isFinite(s.x) &&
+             Number.isFinite(s.y) &&
+             Number.isFinite(s.vx) &&
+             Number.isFinite(s.vy);
+    }
+
+    /*
+      Damping power loss:
+      P_damping = c(vx² + vy²)
+
+      The cumulative dissipated energy is integrated numerically using
+      a trapezoidal approximation over each RK4 time step.
+    */
+    function dampingPower(s, p) {
+      return p.c * (s.vx * s.vx + s.vy * s.vy);
+    }
+
+    // ==============================================================
+    // NUMERICAL METHOD: FOURTH-ORDER RUNGE–KUTTA (RK4)
+    // ==============================================================
+
+    function addScaledState(s, k, factor) {
+      return {
+        x: s.x + factor * k.dx,
+        y: s.y + factor * k.dy,
+        vx: s.vx + factor * k.dvx,
+        vy: s.vy + factor * k.dvy
+      };
+    }
+
+    function rk4Step(s, p, dt) {
+      const k1 = derivatives(s, p);
+      const k2 = derivatives(addScaledState(s, k1, dt / 2), p);
+      const k3 = derivatives(addScaledState(s, k2, dt / 2), p);
+      const k4 = derivatives(addScaledState(s, k3, dt), p);
+
+      return {
+        x: s.x + (dt / 6) * (k1.dx + 2 * k2.dx + 2 * k3.dx + k4.dx),
+        y: s.y + (dt / 6) * (k1.dy + 2 * k2.dy + 2 * k3.dy + k4.dy),
+        vx: s.vx + (dt / 6) * (k1.dvx + 2 * k2.dvx + 2 * k3.dvx + k4.dvx),
+        vy: s.vy + (dt / 6) * (k1.dvy + 2 * k2.dvy + 2 * k3.dvy + k4.dvy)
+      };
+    }
+
+    function advanceMainSimulation() {
+      if (state.settled || state.t >= MAX_TIME) {
+        running = false;
+        return;
+      }
+
+      const oldState = { ...state };
+      const next = rk4Step(oldState, params, params.dt);
+
+      if (!isFiniteState(next)) {
+        running = false;
+        showWarning(
+          "A non-finite numerical value occurred. Try lower magnetic strength A, smaller Δt, or inspect the model."
+        );
+        return;
+      }
+
+      const oldPower = dampingPower(oldState, params);
+      const newPower = dampingPower(next, params);
+
+      /*
+        Trapezoidal numerical estimate:
+        ΔWd ≈ 0.5(P_old + P_new) Δt
+      */
+      const dissipatedIncrement = 0.5 * (oldPower + newPower) * params.dt;
+
+      state = {
+        ...next,
+        t: oldState.t + params.dt,
+        dissipatedEnergy: oldState.dissipatedEnergy + dissipatedIncrement,
+        belowThresholdTime: oldState.belowThresholdTime,
+        settled: false
+      };
+
+      const currentSpeed = speedOf(state);
+
+      if (currentSpeed < STOP_SPEED) {
+        state.belowThresholdTime += params.dt;
+      } else {
+        state.belowThresholdTime = 0;
+      }
+
+      if (state.belowThresholdTime >= STOP_DURATION) {
+        state.settled = true;
+        running = false;
+      }
+
+      recordHistory();
+    }
+
+    /*
+      General-purpose offline simulation for comparison trajectories
+      and optional basin-of-attraction classification.
+
+      Uses the chosen dt passed in simulationParams.
+    */
+    function simulateTrajectory(initialState, simulationParams, maxTime = MAX_TIME, recordPath = true) {
+      let s = {
+        ...initialState,
+        t: 0,
+        dissipatedEnergy: 0,
+        belowThresholdTime: 0
+      };
+
+      const localDt = simulationParams.dt;
+      const maxSteps = Math.floor(maxTime / localDt);
+      let belowThreshold = 0;
+      let settled = false;
+      let invalid = false;
+      const path = [];
+
+      for (let step = 0; step < maxSteps; step++) {
+        if (recordPath && step % Math.max(1, Math.round(0.008 / localDt)) === 0) {
+          path.push({ x: s.x, y: s.y });
+        }
+
+        const oldS = { ...s };
+        const next = rk4Step(oldS, simulationParams, localDt);
+
+        if (!isFiniteState(next)) {
+          invalid = true;
+          break;
+        }
+
+        const dissipatedIncrement =
+          0.5 * (dampingPower(oldS, simulationParams) + dampingPower(next, simulationParams)) * localDt;
+
+        s = {
+          ...next,
+          t: oldS.t + localDt,
+          dissipatedEnergy: oldS.dissipatedEnergy + dissipatedIncrement
+        };
+
+        const currentSpeed = speedOf(s);
+        belowThreshold = currentSpeed < STOP_SPEED ? belowThreshold + localDt : 0;
+
+        if (belowThreshold >= STOP_DURATION) {
+          settled = true;
+          break;
+        }
+      }
+
+      if (recordPath && !invalid) {
+        path.push({ x: s.x, y: s.y });
+      }
+
+      return {
+        finalState: s,
+        path,
+        settled,
+        invalid,
+        initialEnergy: mechanicalEnergy(initialState, simulationParams),
+        finalEnergy: mechanicalEnergy(s, simulationParams)
+      };
+    }
+
+    function nearestMagnetIndex(s) {
+      let bestIndex = 0;
+      let bestDistanceSquared = Infinity;
+
+      MAGNETS.forEach((magnet, index) => {
+        const dx = s.x - magnet.x;
+        const dy = s.y - magnet.y;
+        const distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared < bestDistanceSquared) {
+          bestDistanceSquared = distanceSquared;
+          bestIndex = index;
+        }
+      });
+
+      return bestIndex;
+    }
+
+    function outcomeText(result) {
+      if (result.invalid) return "Invalid numerical result";
+      if (!result.settled) return "Did not settle before maximum time";
+      return `Settled near ${MAGNETS[nearestMagnetIndex(result.finalState)].name}`;
+    }
+
+    // ==============================================================
+    // UI CONTROLS
+    // ==============================================================
+
+    const controls = {
+      x0: document.getElementById("x0"),
+      y0: document.getElementById("y0"),
+      damping: document.getElementById("damping"),
+      mass: document.getElementById("mass"),
+      strength: document.getElementById("strength"),
+      timeStep: document.getElementById("timeStep"),
+
+      x0Value: document.getElementById("x0Value"),
+      y0Value: document.getElementById("y0Value"),
+      dampingValue: document.getElementById("dampingValue"),
+      massValue: document.getElementById("massValue"),
+      strengthValue: document.getElementById("strengthValue"),
+      timeStepValue: document.getElementById("timeStepValue")
+    };
+
+    function syncControlsToParameters() {
+      params.x0 = Number(controls.x0.value);
+      params.y0 = Number(controls.y0.value);
+      params.c = Number(controls.damping.value);
+      params.m = Number(controls.mass.value);
+      params.A = Number(controls.strength.value);
+      params.dt = Number(controls.timeStep.value);
+
+      controls.x0Value.textContent = `${params.x0.toFixed(3)} m`;
+      controls.y0Value.textContent = `${params.y0.toFixed(3)} m`;
+      controls.dampingValue.textContent = `${params.c.toFixed(3)} kg/s`;
+      controls.massValue.textContent = `${params.m.toFixed(3)} kg`;
+      controls.strengthValue.textContent = `${params.A.toFixed(6)} N·m²`;
+      controls.timeStepValue.textContent = `${params.dt.toFixed(4)} s`;
+    }
+
+    function resetSimulation() {
+      running = false;
+      cancelAnimationFrame(animationId);
+
+      lastFrameTime = null;
+      accumulator = 0;
+
+      state = createInitialState();
+      initialMechanicalEnergy = mechanicalEnergy(state, params);
+
+      history = [];
+      trajectory = [];
+      comparisonTrajectory = [];
+      comparisonInfo = null;
+
+      document.getElementById("comparisonResult").textContent =
+        "Run a comparison to display the second trajectory and its final outcome.";
+
+      hideWarning();
+      recordHistory();
+      drawAll();
+    }
+
+    function recordHistory() {
+      const K = kineticEnergy(state, params);
+      const U = magneticPotential(state, params);
+      const E = K + U;
+      const energyCheck = E + state.dissipatedEnergy;
+      const balanceDifference = energyCheck - initialMechanicalEnergy;
+
+      history.push({
+        t: state.t,
+        x: state.x,
+        y: state.y,
+        speed: speedOf(state),
+        kinetic: K,
+        potential: U,
+        mechanical: E,
+        dissipated: state.dissipatedEnergy,
+        energyCheck,
+        balanceDifference
+      });
+
+      trajectory.push({ x: state.x, y: state.y });
+
+      // Limit stored points for long simulations.
+      if (history.length > 9000) {
+        history = history.filter((_, index) => index % 2 === 0);
+      }
+
+      if (trajectory.length > 5500) {
+        trajectory = trajectory.filter((_, index) => index % 2 === 0);
+      }
+    }
+
+    // ==============================================================
+    // DRAWING / GRAPHING
+    // ==============================================================
+
+    const motionCanvas = document.getElementById("motionCanvas");
+    const motionCtx = motionCanvas.getContext("2d");
+    const basinCanvas = document.getElementById("basinCanvas");
+    const basinCtx = basinCanvas.getContext("2d");
+
+    function resizeCanvasForDisplay(canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const displayWidth = Math.floor(canvas.clientWidth * ratio);
+      const displayHeight = Math.floor(canvas.clientHeight * ratio);
+
+      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+      }
+    }
+
+    function worldToCanvas(x, y, canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const padding = 36 * ratio;
+      const usableWidth = canvas.width - 2 * padding;
+      const usableHeight = canvas.height - 2 * padding;
+
+      return {
+        x: padding + ((x + WORLD_LIMIT) / (2 * WORLD_LIMIT)) * usableWidth,
+        y: canvas.height - padding - ((y + WORLD_LIMIT) / (2 * WORLD_LIMIT)) * usableHeight
+      };
+    }
+
+    function drawAxes(ctx, canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const origin = worldToCanvas(0, 0, canvas);
+
+      ctx.save();
+      ctx.strokeStyle = "#dce5f1";
+      ctx.lineWidth = 1 * ratio;
+
+      for (let value = -0.10; value <= 0.1001; value += 0.02) {
+        const top = worldToCanvas(value, WORLD_LIMIT, canvas);
+        const bottom = worldToCanvas(value, -WORLD_LIMIT, canvas);
+
+        ctx.beginPath();
+        ctx.moveTo(top.x, top.y);
+        ctx.lineTo(bottom.x, bottom.y);
+        ctx.stroke();
+
+        const left = worldToCanvas(-WORLD_LIMIT, value, canvas);
+        const right = worldToCanvas(WORLD_LIMIT, value, canvas);
+
+        ctx.beginPath();
+        ctx.moveTo(left.x, left.y);
+        ctx.lineTo(right.x, right.y);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "#98a7ba";
+      ctx.lineWidth = 1.5 * ratio;
+
+      ctx.beginPath();
+      ctx.moveTo(0, origin.y);
+      ctx.lineTo(canvas.width, origin.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(origin.x, 0);
+      ctx.lineTo(origin.x, canvas.height);
+      ctx.stroke();
+
+      ctx.fillStyle = "#5c6d82";
+      ctx.font = `${11 * ratio}px Arial`;
+      ctx.fillText("x (m)", canvas.width - 42 * ratio, origin.y - 7 * ratio);
+      ctx.fillText("y (m)", origin.x + 7 * ratio, 17 * ratio);
+
+      ctx.restore();
+    }
+
+    function drawPath(ctx, canvas, path, color, width = 2, alpha = 1) {
+      if (!path || path.length < 2) return;
+
+      const ratio = window.devicePixelRatio || 1;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width * ratio;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+
+      path.forEach((point, index) => {
+        const canvasPoint = worldToCanvas(point.x, point.y, canvas);
+        if (index === 0) {
+          ctx.moveTo(canvasPoint.x, canvasPoint.y);
+        } else {
+          ctx.lineTo(canvasPoint.x, canvasPoint.y);
+        }
+      });
+
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawMagnets(ctx, canvas) {
+      const ratio = window.devicePixelRatio || 1;
+
+      MAGNETS.forEach((magnet) => {
+        const p = worldToCanvas(magnet.x, magnet.y, canvas);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 10 * ratio, 0, Math.PI * 2);
+        ctx.fillStyle = magnet.color;
+        ctx.fill();
+
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2 * ratio;
+        ctx.stroke();
+
+        ctx.fillStyle = "#273244";
+        ctx.font = `bold ${11 * ratio}px Arial`;
+        ctx.fillText(magnet.name, p.x + 12 * ratio, p.y - 10 * ratio);
+        ctx.restore();
+      });
+    }
+
+    function drawPendulum(ctx, canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const point = worldToCanvas(state.x, state.y, canvas);
+
+      ctx.save();
+
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 7 * ratio, 0, Math.PI * 2);
+      ctx.fillStyle = "#101827";
+      ctx.fill();
+
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2 * ratio;
+      ctx.stroke();
+
+      const currentSpeed = speedOf(state);
+
+      if (currentSpeed > 0.0001) {
+        const arrowScale = 0.012 / Math.max(currentSpeed, 0.012);
+        const endpoint = worldToCanvas(
+          state.x + state.vx * arrowScale,
+          state.y + state.vy * arrowScale,
+          canvas
+        );
+
+        ctx.strokeStyle = "#101827";
+        ctx.lineWidth = 2 * ratio;
+        ctx.beginPath();
+        ctx.moveTo(point.x, point.y);
+        ctx.lineTo(endpoint.x, endpoint.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawMotion() {
+      resizeCanvasForDisplay(motionCanvas);
+
+      motionCtx.clearRect(0, 0, motionCanvas.width, motionCanvas.height);
+      motionCtx.fillStyle = "#fcfdff";
+      motionCtx.fillRect(0, 0, motionCanvas.width, motionCanvas.height);
+
+      drawAxes(motionCtx, motionCanvas);
+      drawPath(motionCtx, motionCanvas, trajectory, "#246bfd", 2.2, 0.9);
+      drawPath(motionCtx, motionCanvas, comparisonTrajectory, "#7d4cdb", 2.0, 0.86);
+      drawMagnets(motionCtx, motionCanvas);
+      drawPendulum(motionCtx, motionCanvas);
+    }
+
+    function drawGraph(canvasId, series, colors, yLabel, legendLabels = []) {
+      const canvas = document.getElementById(canvasId);
+      resizeCanvasForDisplay(canvas);
+
+      const ctx = canvas.getContext("2d");
+      const ratio = window.devicePixelRatio || 1;
+      const width = canvas.width;
+      const height = canvas.height;
+
+      const padding = {
+        left: 52 * ratio,
+        right: 16 * ratio,
+        top: 18 * ratio,
+        bottom: 33 * ratio
+      };
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = "#dce5ef";
+      ctx.lineWidth = 1 * ratio;
+      ctx.strokeRect(
+        padding.left,
+        padding.top,
+        width - padding.left - padding.right,
+        height - padding.top - padding.bottom
+      );
+
+      if (history.length < 2) {
+        ctx.fillStyle = "#657487";
+        ctx.font = `${12 * ratio}px Arial`;
+        ctx.fillText("Run the simulation to generate data.", padding.left, height / 2);
+        return;
+      }
+
+      const times = history.map(point => point.t);
+      let minTime = Math.min(...times);
+      let maxTime = Math.max(...times);
+
+      if (maxTime <= minTime) maxTime = minTime + 1;
+
+      let values = [];
+      series.forEach(fn => {
+        values = values.concat(history.map(fn).filter(Number.isFinite));
+      });
+
+      let minValue = Math.min(...values);
+      let maxValue = Math.max(...values);
+
+      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) return;
+
+      if (Math.abs(maxValue - minValue) < 1e-14) {
+        const margin = Math.max(Math.abs(maxValue) * 0.2, 0.001);
+        minValue -= margin;
+        maxValue += margin;
+      } else {
+        const margin = 0.10 * (maxValue - minValue);
+        minValue -= margin;
+        maxValue += margin;
+      }
+
+      function mapX(t) {
+        return padding.left +
+          ((t - minTime) / (maxTime - minTime)) * (width - padding.left - padding.right);
+      }
+
+      function mapY(value) {
+        return height - padding.bottom -
+          ((value - minValue) / (maxValue - minValue)) * (height - padding.top - padding.bottom);
+      }
+
+      // Graph grid
+      ctx.strokeStyle = "#edf1f6";
+      ctx.lineWidth = 1 * ratio;
+
+      for (let i = 0; i <= 4; i++) {
+        const y = padding.top + i * (height - padding.top - padding.bottom) / 4;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i <= 4; i++) {
+        const x = padding.left + i * (width - padding.left - padding.right) / 4;
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, height - padding.bottom);
+        ctx.stroke();
+      }
+
+      series.forEach((fn, index) => {
+        ctx.save();
+        ctx.strokeStyle = colors[index];
+        ctx.lineWidth = 2 * ratio;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.beginPath();
+
+        history.forEach((dataPoint, pointIndex) => {
+          const x = mapX(dataPoint.t);
+          const y = mapY(fn(dataPoint));
+
+          if (pointIndex === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      ctx.fillStyle = "#59697d";
+      ctx.font = `${10 * ratio}px Arial`;
+      ctx.fillText(`t: ${minTime.toFixed(1)}–${maxTime.toFixed(1)} s`, padding.left, height - 8 * ratio);
+
+      const rangeText = `${yLabel}: ${minValue.toExponential(2)} to ${maxValue.toExponential(2)}`;
+      ctx.fillText(rangeText, padding.left, 12 * ratio);
+
+      legendLabels.forEach((label, index) => {
+        const x = width - padding.right - (legendLabels.length - index) * 70 * ratio;
+        ctx.fillStyle = colors[index];
+        ctx.fillRect(x, 5 * ratio, 11 * ratio, 4 * ratio);
+        ctx.fillStyle = "#59697d";
+        ctx.fillText(label, x + 14 * ratio, 12 * ratio);
+      });
+    }
+
+    function drawGraphs() {
+      drawGraph("xGraph", [d => d.x], ["#246bfd"], "x (m)");
+      drawGraph("yGraph", [d => d.y], ["#e84d5b"], "y (m)");
+      drawGraph("speedGraph", [d => d.speed], ["#1fad75"], "speed (m/s)");
+
+      drawGraph(
+        "energyGraph",
+        [d => d.kinetic, d => d.potential, d => d.mechanical],
+        ["#246bfd", "#f59c1a", "#7d4cdb"],
+        "energy (J)",
+        ["K", "U", "E"]
+      );
+
+      drawGraph(
+        "balanceGraph",
+        [d => d.balanceDifference],
+        ["#d53b9d"],
+        "E + Wd − E0 (J)"
+      );
+    }
+
+    function updateReadouts() {
+      const K = kineticEnergy(state, params);
+      const E = mechanicalEnergy(state, params);
+      const energyCheck = E + state.dissipatedEnergy;
+      const difference = energyCheck - initialMechanicalEnergy;
+
+      document.getElementById("timeReadout").textContent = `${state.t.toFixed(3)} s`;
+
+      let status = "Paused";
+
+      if (state.settled) {
+        status = `Settled near ${MAGNETS[nearestMagnetIndex(state)].name}`;
+      } else if (state.t >= MAX_TIME) {
+        status = "Maximum time reached";
+      } else if (running) {
+        status = "Running";
+      } else if (state.t === 0) {
+        status = "Ready";
+      }
+
+      document.getElementById("statusReadout").textContent = status;
+      document.getElementById("positionReadout").textContent =
+        `(${state.x.toFixed(4)}, ${state.y.toFixed(4)}) m`;
+      document.getElementById("velocityReadout").textContent =
+        `(${state.vx.toFixed(4)}, ${state.vy.toFixed(4)}) m/s`;
+      document.getElementById("speedReadout").textContent = `${speedOf(state).toFixed(5)} m/s`;
+      document.getElementById("keReadout").textContent = `${K.toFixed(7)} J`;
+      document.getElementById("energyReadout").textContent = `${E.toFixed(7)} J`;
+      document.getElementById("dissipationReadout").textContent =
+        `${state.dissipatedEnergy.toFixed(7)} J`;
+      document.getElementById("energyCheckReadout").textContent =
+        `${energyCheck.toFixed(7)} J`;
+      document.getElementById("balanceDifferenceReadout").textContent =
+        `${difference.toExponential(3)} J`;
+    }
+
+    function drawAll() {
+      drawMotion();
+      drawGraphs();
+      updateReadouts();
+    }
+
+    // ==============================================================
+    // ANIMATION
+    // ==============================================================
+
+    function animate(timestamp) {
+      if (!running) {
+        drawAll();
+        return;
+      }
+
+      if (lastFrameTime === null) lastFrameTime = timestamp;
+
+      const elapsed = Math.min((timestamp - lastFrameTime) / 1000, 0.05);
+      lastFrameTime = timestamp;
+
+      /*
+        Accelerate simulation time relative to wall-clock time.
+        This does not change numerical dt; it only changes the number of
+        RK4 integration steps performed each animation frame.
+      */
+      accumulator += elapsed * 2.5;
+
+      while (accumulator >= params.dt && running) {
+        advanceMainSimulation();
+        accumulator -= params.dt;
+      }
+
+      drawAll();
+
+      if (running) {
+        animationId = requestAnimationFrame(animate);
+      }
+    }
+
+    function startSimulation() {
+      if (state.settled || state.t >= MAX_TIME) {
+        resetSimulation();
+      }
+
+      hideWarning();
+      running = true;
+      lastFrameTime = null;
+      animationId = requestAnimationFrame(animate);
+    }
+
+    function pauseSimulation() {
+      running = false;
+      cancelAnimationFrame(animationId);
+      drawAll();
+    }
+
+    // ==============================================================
+    // COMPARISON MODE
+    // ==============================================================
+
+    const compareType = document.getElementById("compareType");
+    const compareValue = document.getElementById("compareValue");
+
+    function updateComparisonInput() {
+      const label = document.getElementById("compareLabel");
+
+      if (compareType.value === "xPosition") {
+        label.textContent = "Comparison x₀ (m)";
+        compareValue.min = "-0.10";
+        compareValue.max = "0.10";
+        compareValue.step = "0.001";
+        compareValue.value = (-params.x0).toFixed(3);
+      }
+
+      if (compareType.value === "yPosition") {
+        label.textContent = "Comparison y₀ (m)";
+        compareValue.min = "-0.10";
+        compareValue.max = "0.10";
+        compareValue.step = "0.001";
+        compareValue.value = (-params.y0).toFixed(3);
+      }
+
+      if (compareType.value === "damping") {
+        label.textContent = "Comparison damping c (kg/s)";
+        compareValue.min = "0.01";
+        compareValue.max = "0.50";
+        compareValue.step = "0.005";
+        compareValue.value = Math.min(0.50, params.c + 0.10).toFixed(3);
+      }
+
+      if (compareType.value === "timeStep") {
+        label.textContent = "Comparison integration time step Δt (s)";
+        compareValue.min = "0.0005";
+        compareValue.max = "0.002";
+        compareValue.step = "0.0005";
+        compareValue.value = params.dt === 0.002 ? "0.001" : "0.002";
+      }
+    }
+
+    function runComparison() {
+      const comparisonParams = { ...params };
+      const comparisonInitialState = {
+        x: params.x0,
+        y: params.y0,
+        vx: 0,
+        vy: 0
+      };
+
+      const selectedValue = Number(compareValue.value);
+
+      /*
+        Only one selected quantity is changed. All other physical parameters,
+        initial values, and integration settings remain identical.
+      */
+      if (compareType.value === "xPosition") {
+        comparisonInitialState.x = selectedValue;
+      } else if (compareType.value === "yPosition") {
+        comparisonInitialState.y = selectedValue;
+      } else if (compareType.value === "damping") {
+        comparisonParams.c = selectedValue;
+      } else if (compareType.value === "timeStep") {
+        comparisonParams.dt = selectedValue;
+      }
+
+      const mainInitialState = {
+        x: params.x0,
+        y: params.y0,
+        vx: 0,
+        vy: 0
+      };
+
+      const mainResult = simulateTrajectory(mainInitialState, params, MAX_TIME, false);
+      const comparisonResult = simulateTrajectory(
+        comparisonInitialState,
+        comparisonParams,
+        MAX_TIME,
+        true
+      );
+
+      comparisonTrajectory = comparisonResult.path;
+      comparisonInfo = comparisonResult;
+
+      const mainOutcome = outcomeText(mainResult);
+      const compareOutcome = outcomeText(comparisonResult);
+
+      let conclusion = "Final-region comparison is not available because one or both paths did not settle.";
+
+      if (mainResult.settled && comparisonResult.settled) {
+        const sameMagnet =
+          nearestMagnetIndex(mainResult.finalState) === nearestMagnetIndex(comparisonResult.finalState);
+
+        conclusion = sameMagnet
+          ? "Both trajectories settled near the same magnet."
+          : "The trajectories settled near different magnets.";
+      }
+
+      document.getElementById("comparisonResult").innerHTML =
+        `<strong>Main (blue):</strong> ${mainOutcome}<br>` +
+        `<strong>Comparison (purple):</strong> ${compareOutcome}<br>` +
+        `<strong>Result:</strong> ${conclusion}`;
+
+      if (comparisonResult.invalid) {
+        showWarning("The comparison produced a non-finite value. Check parameters and Δt.");
+      }
+
+      drawAll();
+    }
+
+    // ==============================================================
+    // BASIN-OF-ATTRACTION MAP
+    // ==============================================================
+
+    async function createBasinMap() {
+      const basinButton = document.getElementById("basinBtn");
+      const basinStatus = document.getElementById("basinStatus");
+
+      basinButton.disabled = true;
+      basinStatus.textContent = "Calculating basin map...";
+
+      resizeCanvasForDisplay(basinCanvas);
+
+      const width = basinCanvas.width;
+      const height = basinCanvas.height;
+      const image = basinCtx.createImageData(width, height);
+
+      /*
+        The basin map is intentionally coarser than the main run.
+        It is designed as an exploratory visualization, not a precision calculation.
+      */
+      // STUDENT MODIFICATION: Increase gridN for greater detail, but expect slower calculation.
+      const gridN = 48;
+      const basinDt = Math.max(params.dt, 0.002);
+      const basinMaxTime = 11;
+      const basinStopSpeed = 0.002;
+      const basinStopDuration = 0.35;
+
+      const colors = [
+        [232, 77, 91],
+        [31, 173, 117],
+        [245, 156, 26],
+        [154, 167, 183]
+      ];
+
+      function classifyInitialPosition(x0, y0) {
+        let s = {
+          x: x0,
+          y: y0,
+          vx: 0,
+          vy: 0
+        };
+
+        let below = 0;
+        const maxSteps = Math.floor(basinMaxTime / basinDt);
+
+        for (let step = 0; step < maxSteps; step++) {
+          s = rk4Step(s, params, basinDt);
+
+          if (!isFiniteState(s)) return 3;
+
+          const currentSpeed = speedOf(s);
+          below = currentSpeed < basinStopSpeed ? below + basinDt : 0;
+
+          if (below >= basinStopDuration) {
+            return nearestMagnetIndex(s);
+          }
+        }
+
+        return 3;
+      }
+
+      const cellWidth = width / gridN;
+      const cellHeight = height / gridN;
+
+      for (let row = 0; row < gridN; row++) {
+        for (let col = 0; col < gridN; col++) {
+          const initialX = -0.10 + ((col + 0.5) / gridN) * 0.20;
+          const initialY = 0.10 - ((row + 0.5) / gridN) * 0.20;
+
+          const group = classifyInitialPosition(initialX, initialY);
+          const color = colors[group];
+
+          const xStart = Math.floor(col * cellWidth);
+          const xEnd = Math.ceil((col + 1) * cellWidth);
+          const yStart = Math.floor(row * cellHeight);
+          const yEnd = Math.ceil((row + 1) * cellHeight);
+
+          for (let py = yStart; py < yEnd && py < height; py++) {
+            for (let px = xStart; px < xEnd && px < width; px++) {
+              const pixelIndex = 4 * (py * width + px);
+
+              image.data[pixelIndex] = color[0];
+              image.data[pixelIndex + 1] = color[1];
+              image.data[pixelIndex + 2] = color[2];
+              image.data[pixelIndex + 3] = 255;
+            }
+          }
+        }
+
+        if (row % 4 === 0) {
+          basinCtx.putImageData(image, 0, 0);
+          basinStatus.textContent = `Calculating basin map: ${Math.round((row / gridN) * 100)}%`;
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+
+      basinCtx.putImageData(image, 0, 0);
+
+      const ratio = window.devicePixelRatio || 1;
+
+      MAGNETS.forEach(magnet => {
+        const p = worldToCanvas(magnet.x, magnet.y, basinCanvas);
+
+        basinCtx.beginPath();
+        basinCtx.arc(p.x, p.y, 6 * ratio, 0, Math.PI * 2);
+        basinCtx.fillStyle = "#ffffff";
+        basinCtx.fill();
+        basinCtx.lineWidth = 2 * ratio;
+        basinCtx.strokeStyle = "#1e293b";
+        basinCtx.stroke();
+      });
+
+      basinStatus.textContent =
+        `Basin map complete. Coarse calculation used Δt = ${basinDt.toFixed(4)} s. ` +
+        "Colors show a settling classification, not a proof of an exact basin boundary.";
+
+      basinButton.disabled = false;
+    }
+
+    // ==============================================================
+    // EVENT HANDLERS
+    // ==============================================================
+
+    function showWarning(message) {
+      const warning = document.getElementById("warning");
+      warning.textContent = message;
+      warning.style.display = "block";
+    }
+
+    function hideWarning() {
+      document.getElementById("warning").style.display = "none";
+    }
+
+    /*
+      STUDENT MODIFICATION:
+      Add controls for initial vx and vy. Then use those values in createInitialState()
+      and in the comparison initial-state setup.
+    */
+    [
+      controls.x0,
+      controls.y0,
+      controls.damping,
+      controls.mass,
+      controls.strength,
+      controls.timeStep
+    ].forEach(control => {
+      control.addEventListener("input", () => {
+        syncControlsToParameters();
+        resetSimulation();
+        updateComparisonInput();
+      });
+
+      control.addEventListener("change", () => {
+        syncControlsToParameters();
+        resetSimulation();
+        updateComparisonInput();
+      });
+    });
+
+    document.getElementById("startBtn").addEventListener("click", startSimulation);
+    document.getElementById("pauseBtn").addEventListener("click", pauseSimulation);
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      syncControlsToParameters();
+      resetSimulation();
+    });
+
+    compareType.addEventListener("change", updateComparisonInput);
+    document.getElementById("compareBtn").addEventListener("click", runComparison);
+    document.getElementById("basinBtn").addEventListener("click", createBasinMap);
+
+    window.addEventListener("resize", drawAll);
+
+    // Initial page setup
+    syncControlsToParameters();
+    updateComparisonInput();
+    resetSimulation();
+  </script>
+</body>
+</html>
